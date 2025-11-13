@@ -79,34 +79,38 @@ class EpicScraper:
             driver.get(f"https://store.epicgames.com/pt-BR/browse?q={jogo.replace(' ', '%20')}&sortBy=relevancy")
             wait = WebDriverWait(driver, 15)
 
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-            time.sleep(3)
+            wait.until(EC.presence_of_element_located((By.TAG_NAME, "section")))
+            time.sleep(5)
 
             xpath_busca = f"//a[contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{jogo.lower()}')]"
             
             try:
                 card = driver.find_element(By.XPATH, f"({xpath_busca})[1]")
             except:
-                card = driver.find_element(By.CSS_SELECTOR, "section ul li a")
+                try:
+                    card = driver.find_element(By.CSS_SELECTOR, "section ul li a")
+                except:
+                    return None
 
-            titulo = jogo.capitalize()
-            try:
-                linhas = card.text.split('\n')
-                for l in linhas:
-                    if len(l) > 3 and "R$" not in l and "Gratuito" not in l:
-                        titulo = l
-                        break
-            except: pass
+            titulo = card.get_attribute("aria-label")
+            if not titulo:
+                titulo = jogo.capitalize()
 
-            texto_completo = card.text
+            texto_completo = card.get_attribute("innerText")
             texto_preco = "R$ 0,00"
             
             if "Gratuito" in texto_completo or "Free" in texto_completo:
                 texto_preco = "Gratuito"
             else:
-                encontrados = re.findall(r'R\$\s*\d+[.,]\d+', texto_completo)
+                encontrados = re.findall(r'R\$\s*[\d\.]+,?\d*', texto_completo)
+                
                 if encontrados:
                     texto_preco = encontrados[-1]
+                elif "Ver ofertas" in texto_completo or "View offers" in texto_completo:
+                    texto_preco = "Ver Ofertas (Várias Edições)"
+                    match_apartir = re.search(r'[\d\.]+,?\d*', texto_completo)
+                    if match_apartir:
+                        texto_preco = f"A partir de R$ {match_apartir.group(0)}"
 
             return {
                 "loja": "Epic Games",
@@ -150,9 +154,12 @@ def main():
                 print(f"   Preço: {res['preco_texto']}")
                 print("-" * 30)
                 
-                if res['preco_valor'] is not None and res['preco_valor'] < menor_preco:
+                if res['preco_valor'] is not None and res['preco_valor'] < menor_preco and res['preco_valor'] > 0:
                     menor_preco = res['preco_valor']
                     melhor_opcao = res
+                elif res['preco_valor'] == 0 and "Gratuito" in res['preco_texto']:
+                     menor_preco = 0
+                     melhor_opcao = res
 
             print("="*50)
             if melhor_opcao:
