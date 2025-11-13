@@ -36,6 +36,22 @@ def limpar_preco(texto_preco, valor_numerico=None):
     except ValueError:
         return 0.0
 
+def validar_titulo(termo_busca, titulo_encontrado):
+    if not titulo_encontrado:
+        return False
+    
+    termo_limpo = termo_busca.lower().split()
+    titulo_limpo = titulo_encontrado.lower()
+    
+    matches = 0
+    for palavra in termo_limpo:
+        if len(palavra) > 1 and palavra in titulo_limpo:
+            matches += 1
+            
+    if len(termo_limpo) > 0:
+        return (matches / len(termo_limpo)) >= 0.5
+    return False
+
 class SteamScraper:
     def buscar(self, driver, jogo):
         print(f"🔄 Buscando '{jogo}' na Steam...")
@@ -47,6 +63,10 @@ class SteamScraper:
             primeiro_jogo = driver.find_element(By.CSS_SELECTOR, "a.search_result_row")
             titulo = primeiro_jogo.find_element(By.CLASS_NAME, "title").text
             
+            if not validar_titulo(jogo, titulo):
+                print(f"⚠️ Resultado ignorado na Steam (inconsistente): '{titulo}'")
+                return None
+
             try:
                 div_preco = primeiro_jogo.find_element(By.CSS_SELECTOR, ".search_price_discount_combined")
                 preco_centavos = div_preco.get_attribute("data-price-final")
@@ -69,7 +89,6 @@ class SteamScraper:
                 "url": primeiro_jogo.get_attribute("href")
             }
         except Exception as e:
-            print(f"❌ Erro na Steam: {e}")
             return None
 
 class EpicScraper:
@@ -96,6 +115,10 @@ class EpicScraper:
             if not titulo:
                 titulo = jogo.capitalize()
 
+            if not validar_titulo(jogo, titulo):
+                print(f"⚠️ Resultado ignorado na Epic (inconsistente): '{titulo}'")
+                return None
+
             texto_completo = card.get_attribute("innerText")
             texto_preco = "R$ 0,00"
             
@@ -120,7 +143,6 @@ class EpicScraper:
                 "url": driver.current_url
             }
         except Exception as e:
-            print(f"❌ Erro na Epic Games: {str(e)[:100]}...")
             return None
 
 def main():
@@ -147,7 +169,7 @@ def main():
         menor_preco = float('inf')
 
         if not resultados:
-            print("⚠️ Nenhum jogo encontrado. Tente outro nome.")
+            print("⚠️ Nenhum jogo encontrado com esse nome.")
         else:
             for res in resultados:
                 print(f"📍 {res['loja']}: {res['titulo']}")
